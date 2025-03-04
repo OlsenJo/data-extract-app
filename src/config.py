@@ -34,3 +34,10 @@ class Config:
     
     # Retry delay in seconds
     RETRY_DELAY = 5
+
+    # Temporary folder for storing downloaded CSV files
+    TEMP_FOLDER = os.getenv("TEMP_FOLDER", "temp_csv")
+    
+    
+    # Whether to keep temporary CSV files after processing
+    KEEP_TEMP_FILES = os.getenv("KEEP_TEMP_FILES", "True").lower() in ("true", "1", "t")
