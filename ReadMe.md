@@ -41,33 +41,6 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 \`\`\`
 
-## Database Schema
-
-The pipeline creates a table called `gas_shipments` with the following schema:
-
-\`\`\`sql
-CREATE TABLE gas_shipments (
-    id SERIAL PRIMARY KEY,
-    loc TEXT NOT NULL,
-    loc_zone TEXT,
-    loc_name TEXT,
-    loc_purpose TEXT,
-    measure_basis TEXT,
-    oper_capacity NUMERIC,
-    design_capacity NUMERIC,
-    scheduled_qty NUMERIC,
-    operationally_available NUMERIC,
-    total_scheduled NUMERIC,
-    gas_day DATE NOT NULL,
-    cycle INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(loc, gas_day, cycle)
-);
-
-CREATE INDEX idx_gas_shipments_gas_day ON gas_shipments(gas_day);
-CREATE INDEX idx_gas_shipments_loc ON gas_shipments(loc);
-\`\`\`
-
 ## Usage
 
 Run the pipeline with the following command:
