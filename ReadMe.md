@@ -15,7 +15,7 @@ The pipeline performs the following tasks:
 
 - Python 3.8 or higher
 - PostgreSQL database
-- Python packages (see requirements.txt)
+- Python packages (see src/requirements.txt)
 
 ## Installation
 
