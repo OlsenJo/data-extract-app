@@ -97,20 +97,6 @@ You can configure the following options in the `.env` file:
 - `TEMP_FOLDER`: Folder to store temporary CSV files (default: temp_csv)
 - `KEEP_TEMP_FILES`: Whether to keep temporary CSV files after processing (default: True)
 
-## Project Structure
-
-\`\`\`
-├── main.py              # Entry point for the application
-├── database.py          # Database connection and operations
-├── downloader.py        # CSV downloading functionality
-├── parser.py            # CSV parsing and validation
-├── config.py            # Configuration settings
-├── temp_csv/            # Temporary folder for CSV files
-├── requirements.txt     # Python dependencies
-└── README.md            # Project documentation
-\`\`\`
-
-
 ## CSV Data Format
 
 The CSV files contain the following columns:
