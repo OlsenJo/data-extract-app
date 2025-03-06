@@ -1,7 +1,3 @@
-"""
-Module for database operations.
-"""
-
 import logging
 import psycopg2
 from psycopg2 import sql
@@ -11,19 +7,9 @@ from typing import List, Dict, Any, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 class Database:
-    """Class for database operations."""
     
     def __init__(self, host: str, port: str, database: str, user: str, password: str):
-        """
-        Initialize the database connection.
-        
-        Args:
-            host: Database host
-            port: Database port
-            database: Database name
-            user: Database user
-            password: Database password
-        """
+    
         self.connection_params = {
             'host': host,
             'port': port,
@@ -35,7 +21,6 @@ class Database:
         self.connect()
     
     def connect(self):
-        """Establish a connection to the database."""
         try:
             self.conn = psycopg2.connect(**self.connection_params)
             logger.info("Connected to the database")
@@ -44,13 +29,11 @@ class Database:
             raise
     
     def close(self):
-        """Close the database connection."""
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed")
     
     def initialize_database(self):
-        """Create the necessary tables if they don't exist."""
         try:
             with self.conn.cursor() as cursor:
                 # Create the gas_shipments table
@@ -86,15 +69,6 @@ class Database:
             raise
     
     def deduplicate_records(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Deduplicate records based on the unique constraint (loc, gas_day, cycle).
-        
-        Args:
-            records: List of record dictionaries to deduplicate
-            
-        Returns:
-            Deduplicated list of records
-        """
         if not records:
             return []
         
@@ -104,7 +78,6 @@ class Database:
             # Create a unique key based on the UNIQUE constraint columns
             key = (record['loc'], record['gas_day'], record['cycle'])
             
-            # Keep only the last record for each unique key
             unique_records[key] = record
         
         # Convert back to a list
@@ -115,15 +88,7 @@ class Database:
         return deduplicated
     
     def insert_records(self, records: List[Dict[str, Any]]) -> int:
-        """
-        Insert records into the gas_shipments table.
-        
-        Args:
-            records: List of record dictionaries to insert
-            
-        Returns:
-            Number of records inserted
-        """
+      
         if not records:
             logger.warning("No records to insert")
             return 0
@@ -137,7 +102,6 @@ class Database:
                 return 0
             
             with self.conn.cursor() as cursor:
-                # Prepare the columns and values
                 columns = list(deduplicated_records[0].keys())
                 values = [[record.get(column) for column in columns] for record in deduplicated_records]
                 
@@ -176,16 +140,7 @@ class Database:
             raise
     
     def insert_records_in_batches(self, records: List[Dict[str, Any]], batch_size: int = 1000) -> int:
-        """
-        Insert records into the gas_shipments table in batches to avoid conflicts.
-        
-        Args:
-            records: List of record dictionaries to insert
-            batch_size: Number of records to insert in each batch
-            
-        Returns:
-            Total number of records inserted
-        """
+
         if not records:
             logger.warning("No records to insert")
             return 0
@@ -200,7 +155,6 @@ class Database:
         total_inserted = 0
         
         try:
-            # Process records in batches
             for i in range(0, len(deduplicated_records), batch_size):
                 batch = deduplicated_records[i:i + batch_size]
                 
