@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 class CSVParser:
     
     def __init__(self):
-        """Initialize the parser."""
         pass
     
     def parse_csv(self, csv_data: str) -> List[Dict[str, Any]]:
@@ -37,8 +36,7 @@ class CSVParser:
         return records
     
     def _clean_record(self, row: Dict[str, str]) -> Optional[Dict[str, Any]]:
-       
-        # Create a new record with cleaned data
+        
         record = {}
         
         # Process each field
@@ -70,7 +68,6 @@ class CSVParser:
         if not value or value.strip() == '':
             return None
         
-        # Remove commas and other non-numeric characters
         cleaned_value = value.replace(',', '').strip()
         
         try:
