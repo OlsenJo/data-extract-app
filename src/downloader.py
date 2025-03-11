@@ -67,6 +67,14 @@ class CSVDownloader:
                         # Save CSV to file
                         with open(temp_file_path, 'w', encoding='utf-8') as file:
                             file.write(response.text)
+
+                        # Debug: Print first few lines of the CSV
+                        csv_lines = response.text.split('\n')
+                        header = csv_lines[0] if csv_lines else "No header"
+                        logger.info(f"CSV Header: {header}")    
+                        if len(csv_lines) > 1:
+                            logger.info(f"First data row: {csv_lines[1]}")
+                            
                         logger.info(f"Saved CSV to: {temp_file_path}")
                         return response.text, temp_file_path
                     elif 'text/html' in content_type and 'No data found' in response.text:
