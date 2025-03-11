@@ -2,15 +2,14 @@ import logging
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from typing import List, Dict, Any, Optional, Tuple
+#from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 class Database:
     
     def __init__(self, host, port, database, user, password):
-       
-        # Save connection parameters
+      
         self.host = host
         self.port = port
         self.database = database
@@ -22,7 +21,6 @@ class Database:
     
     def connect(self):
         try:
-            # Try to connect to the database
             self.conn = psycopg2.connect(
                 host=self.host,
                 port=self.port,
@@ -36,7 +34,6 @@ class Database:
                 logger.warning(f"Database '{self.database}' does not exist. Attempting to create it...")
                 
                 try:
-                    # Connect to the default 'postgres' database to create our database
                     temp_conn = psycopg2.connect(
                         host=self.host,
                         port=self.port,
@@ -47,13 +44,15 @@ class Database:
                     temp_conn.autocommit = True  
                     
                     with temp_conn.cursor() as cursor:
+                        
                         cursor.execute(f"CREATE DATABASE {self.database}")
+                    
                     
                     temp_conn.close()
                     
                     logger.info(f"Successfully created database '{self.database}'")
                     
-                    # Now connect to the newly created database
+              
                     self.conn = psycopg2.connect(
                         host=self.host,
                         port=self.port,
@@ -74,7 +73,6 @@ class Database:
             raise
     
     def close(self):
-        # Check if connection exists
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed")
@@ -83,34 +81,75 @@ class Database:
         try:
             cursor = self.conn.cursor()
             
-            # SQL to create the table
-            create_table_sql = """
-                CREATE TABLE IF NOT EXISTS gas_shipments (
-                    id SERIAL PRIMARY KEY,
-                    loc TEXT NOT NULL,
-                    loc_zone TEXT,
-                    loc_name TEXT,
-                    loc_purpose TEXT,
-                    measure_basis TEXT,
-                    oper_capacity NUMERIC,
-                    design_capacity NUMERIC,
-                    scheduled_qty NUMERIC,
-                    operationally_available NUMERIC,
-                    total_scheduled NUMERIC,
-                    gas_day DATE NOT NULL,
-                    cycle INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(loc, gas_day, cycle)
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'gas_shipments'
                 );
-            """
+            """)
+            table_exists = cursor.fetchone()[0]
             
-            cursor.execute(create_table_sql)
-            
-            # Create indexes for better performance
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_gas_shipments_gas_day ON gas_shipments(gas_day);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_gas_shipments_loc ON gas_shipments(loc);")
-            
-            self.conn.commit()
+            if table_exists:
+                cursor.execute("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'gas_shipments';
+                """)
+                existing_columns = [row[0] for row in cursor.fetchall()]
+                
+                new_columns = {
+                    'loc_qti': 'TEXT',
+                    'flow_ind': 'TEXT',
+                    'it': 'NUMERIC',
+                    'auth_overrun_ind': 'TEXT',
+                    'nom_cap_exceed_ind': 'TEXT',
+                    'all_qty_avail': 'TEXT',
+                    'qty_reason': 'TEXT'
+                }
+                
+                for col_name, col_type in new_columns.items():
+                    if col_name not in existing_columns:
+                        logger.info(f"Adding missing column: {col_name}")
+                        cursor.execute(f"""
+                            ALTER TABLE gas_shipments 
+                            ADD COLUMN {col_name} {col_type};
+                        """)
+                
+                self.conn.commit()
+                logger.info("Updated table schema with new columns")
+            else:
+                create_table_sql = """
+                    CREATE TABLE IF NOT EXISTS gas_shipments (
+                        id SERIAL PRIMARY KEY,
+                        loc TEXT NOT NULL,
+                        loc_zone TEXT,
+                        loc_name TEXT,
+                        loc_purpose TEXT,
+                        loc_qti TEXT,
+                        flow_ind TEXT,
+                        oper_capacity NUMERIC,
+                        design_capacity NUMERIC,
+                        total_scheduled NUMERIC,
+                        operationally_available NUMERIC,
+                        it NUMERIC,
+                        auth_overrun_ind TEXT,
+                        nom_cap_exceed_ind TEXT,
+                        all_qty_avail TEXT,
+                        qty_reason TEXT,
+                        gas_day DATE NOT NULL,
+                        cycle INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(loc, gas_day, cycle)
+                    );
+                """
+                
+                cursor.execute(create_table_sql)
+                
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_gas_shipments_gas_day ON gas_shipments(gas_day);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_gas_shipments_loc ON gas_shipments(loc);")
+                
+                self.conn.commit()
+                logger.info("Created new gas_shipments table")
             
             cursor.close()
             
@@ -121,18 +160,18 @@ class Database:
             raise
     
     def remove_duplicates(self, records):
+      
         if not records:
             return []
         
         unique_records = {}
         
-        # Loop through all records
         for record in records:
+            key = (record['loc'], record['gas_day'], record['cycle'])
             
-            key = (record['loc'], record['gas_day'], record['cycle'])     
+
             unique_records[key] = record
         
-        # Convert the dictionary values back to a list
         deduplicated = list(unique_records.values())
         
         logger.info(f"Found {len(records) - len(deduplicated)} duplicate records")
@@ -140,13 +179,12 @@ class Database:
         return deduplicated
     
     def insert_records(self, records):
-       
+      
         if not records:
             logger.warning("No records to insert")
             return 0
         
         try:
-            # Remove duplicates before inserting
             unique_records = self.remove_duplicates(records)
             
             if not unique_records:
@@ -164,26 +202,18 @@ class Database:
                     record_values.append(record.get(column))
                 all_values.append(record_values)
             
-            # Build the SQL query
             column_names = ", ".join([f'"{col}"' for col in columns])
             placeholders = ", ".join(["%s"] * len(columns))
             
-           
+            update_columns = [col for col in columns if col not in ('loc', 'gas_day', 'cycle')]
+            update_parts = [f'"{col}" = EXCLUDED."{col}"' for col in update_columns]
+            update_clause = ", ".join(update_parts)
+            
             query = f"""
                 INSERT INTO gas_shipments ({column_names})
                 VALUES %s
                 ON CONFLICT (loc, gas_day, cycle) DO UPDATE
-                SET
-                    loc_zone = EXCLUDED.loc_zone,
-                    loc_name = EXCLUDED.loc_name,
-                    loc_purpose = EXCLUDED.loc_purpose,
-                    measure_basis = EXCLUDED.measure_basis,
-                    oper_capacity = EXCLUDED.oper_capacity,
-                    design_capacity = EXCLUDED.design_capacity,
-                    scheduled_qty = EXCLUDED.scheduled_qty,
-                    operationally_available = EXCLUDED.operationally_available,
-                    total_scheduled = EXCLUDED.total_scheduled,
-                    created_at = CURRENT_TIMESTAMP
+                SET {update_clause}, created_at = CURRENT_TIMESTAMP
                 RETURNING id
             """
             
@@ -193,7 +223,6 @@ class Database:
             
             cursor.close()
             
-            # Return the number of inserted records
             inserted_count = len(result)
             logger.info(f"Inserted {inserted_count} records into the database")
             return inserted_count
@@ -204,36 +233,28 @@ class Database:
             raise
     
     def insert_in_small_groups(self, records, group_size=100):
-        """
-        Insert records into the database in small groups to avoid errors.
-        """
-        # Check if there are any records
+       
         if not records:
             logger.warning("No records to insert")
             return 0
         
-        # Remove duplicates first
         unique_records = self.remove_duplicates(records)
         
         if not unique_records:
             logger.warning("No unique records to insert")
             return 0
         
-        # Keep track of how many records were inserted
         total_inserted = 0
         
         try:
             i = 0
             while i < len(unique_records):
-                # Get a group of records
                 group = unique_records[i:i+group_size]
                 
                 cursor = self.conn.cursor()
                 
-                # Get the column names from the first record
                 columns = list(group[0].keys())
                 
-                # Create a list of values for each record
                 group_values = []
                 for record in group:
                     record_values = []
@@ -243,22 +264,15 @@ class Database:
                 
                 column_names = ", ".join([f'"{col}"' for col in columns])
                 
-                # Insert the group
+                update_columns = [col for col in columns if col not in ('loc', 'gas_day', 'cycle')]
+                update_parts = [f'"{col}" = EXCLUDED."{col}"' for col in update_columns]
+                update_clause = ", ".join(update_parts)
+                
                 query = f"""
                     INSERT INTO gas_shipments ({column_names})
                     VALUES %s
                     ON CONFLICT (loc, gas_day, cycle) DO UPDATE
-                    SET
-                        loc_zone = EXCLUDED.loc_zone,
-                        loc_name = EXCLUDED.loc_name,
-                        loc_purpose = EXCLUDED.loc_purpose,
-                        measure_basis = EXCLUDED.measure_basis,
-                        oper_capacity = EXCLUDED.oper_capacity,
-                        design_capacity = EXCLUDED.design_capacity,
-                        scheduled_qty = EXCLUDED.scheduled_qty,
-                        operationally_available = EXCLUDED.operationally_available,
-                        total_scheduled = EXCLUDED.total_scheduled,
-                        created_at = CURRENT_TIMESTAMP
+                    SET {update_clause}, created_at = CURRENT_TIMESTAMP
                     RETURNING id
                 """
                 
@@ -268,7 +282,6 @@ class Database:
                 
                 cursor.close()
                 
-                # Update the total count
                 group_inserted = len(result)
                 total_inserted += group_inserted
                 logger.info(f"Inserted group of {group_inserted} records (total: {total_inserted})")
